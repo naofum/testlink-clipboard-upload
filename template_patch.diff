@@ -1,0 +1,95 @@
+このファイルはテンプレートの手動修正内容をまとめた参照用差分です。
+詳細は README.md の「テンプレートの手動修正」セクションを参照してください。
+
+==========================================================================
+修正①: gui/templates/tl-classic/execute/execSetResults.tpl
+==========================================================================
+
+【挿入位置】
+  #plugin_display ブロックの直後
+
+【追加内容】
++   {* ClipboardUpload Plugin: モーダルUI・JS を常時出力（テストケース選択状態に依存しない） *}
++   {include file="execute/clipboard_modal.tpl"}
+
+
+==========================================================================
+修正②: gui/templates/tl-classic/attachments_simple.inc.tpl
+==========================================================================
+
+【修正前】（74〜77行目付近）
+        <input type="file" name="uploadedFile[{$attach_id}][]" id="uploadedFile_{$attach_id}" multiple 
+               size="{#UPLOAD_FILENAME_SIZE#}" />
+        &nbsp;&nbsp;&nbsp;&nbsp;
+  </div>
+
+【修正後】
+        <input type="file" name="uploadedFile[{$attach_id}][]" id="uploadedFile_{$attach_id}" multiple 
+               size="{#UPLOAD_FILENAME_SIZE#}" />
+        &nbsp;
+        {* ClipboardUpload Plugin: 実行レベル（attach_id=0）はフォーム同梱ボタン *}
+        {if $attach_id == 0}
+          <button type="button"
+                  onclick="clipUpload.openForExec()"
+                  style="cursor:pointer;padding:2px 8px;font-size:12px;"
+                  title="クリップボードから画像を貼り付けて実行結果と一緒に保存">
+            &#128203;
+          </button>
+          <span id="clipupload_exec_status" style="font-size:11px;color:#555;"></span>
+          <input type="hidden" name="clipupload_base64[0]" id="clipupload_base64_exec" value="">
+          <input type="hidden" name="clipupload_filename[0]" id="clipupload_filename_exec" value="">
+        {else}
+          {* ステップレベル: attach_id = tcsteps.id *}
+          <button type="button"
+                  onclick="clipUpload.openForStep({$attach_id})"
+                  style="cursor:pointer;padding:2px 8px;font-size:12px;"
+                  title="クリップボードから画像を貼り付けてステップ結果と一緒に保存">
+            &#128203;
+          </button>
+          <span id="clipupload_step_status_{$attach_id}" style="font-size:11px;color:#555;"></span>
+          <input type="hidden" name="clipupload_base64[{$attach_id}]" id="clipupload_base64_step_{$attach_id}" value="">
+          <input type="hidden" name="clipupload_filename[{$attach_id}]" id="clipupload_filename_step_{$attach_id}" value="">
+        {/if}
+  </div>
+
+
+==========================================================================
+修正③: gui/templates/tl-classic/execute/inc_exec_show_tc_exec.tpl
+==========================================================================
+
+【修正前】（302〜306行目付近）
+      <td align="center"><a href="javascript:openFileUploadWindow({$tc_old_exec.execution_id},'executions')">
+        <img src="{$tlImages.upload}" title="{$labels.alt_attachment_mgmt}"
+             alt="{$labels.alt_attachment_mgmt}"
+             style="border:none" /></a>
+      </td>
+
+【修正後】
+      <td align="center">
+        <a href="javascript:openFileUploadWindow({$tc_old_exec.execution_id},'executions')">
+          <img src="{$tlImages.upload}" title="{$labels.alt_attachment_mgmt}"
+               alt="{$labels.alt_attachment_mgmt}"
+               style="border:none" />
+        </a>
+        &nbsp;
+        <a href="javascript:clipUpload.openModal()"
+           onclick="document.getElementById('clipupload_container').dataset.execId='{$tc_old_exec.execution_id}';return false;"
+           title="クリップボードから画像を貼り付け">
+          📋
+        </a>
+      </td>
+
+
+==========================================================================
+修正④: lib/functions/exec.inc.php
+==========================================================================
+
+詳細は README.md の「修正④」を参照してください。
+
+【修正箇所 A】実行レベルの base64 注入（206行目付近 // Attachment @exec level の直後）
+  $_POST['clipupload_base64'][0] を受け取り、base64decode → tempnam → $_FILES[0] に注入する
+  処理を addAttachmentsToExec() の呼び出し前に追加する。
+
+【修正箇所 B】ステップレベルの base64 注入（295行目付近 $execution_tcsteps_id = ... の直後）
+  ステップ処理ループ内で $_POST['clipupload_base64'][$step_id] を受け取り、
+  base64decode → tempnam → $_FILES[$step_id][0] に注入する処理を追加する。
